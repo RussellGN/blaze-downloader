@@ -1,0 +1,1 @@
+1. add passed url to config 2. implement http agent 3. implement file writer 4. hook up all download logic

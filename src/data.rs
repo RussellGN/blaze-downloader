@@ -3,6 +3,7 @@ use crate::{
     utils::PEResult,
 };
 use colored::*;
+use reqwest::Url;
 
 #[derive(Debug)]
 pub struct ProgramError {
@@ -20,11 +21,24 @@ pub struct Config {
     flags: Vec<Flag>,
 }
 
-struct Downloadable;
+struct Downloadable {
+    url: Url,
+}
+
+impl Downloadable {
+    fn build(url: String) -> PEResult<Self> {
+        let url = Url::parse(&url);
+        if url.is_ok() {
+            Ok(Self { url: url.unwrap() })
+        } else {
+            Err(ProgramError::new(url.unwrap_err().to_string()))
+        }
+    }
+}
 
 impl Config {
     pub fn from<I: Iterator<Item = String>>(mut raw_args: I) -> PEResult<Self> {
-        let downloadables = vec![];
+        let mut downloadables = vec![];
         let mut flags: Vec<Flag> = vec![];
 
         while let Some(mut arg) = raw_args.next() {
@@ -32,7 +46,7 @@ impl Config {
             if arg.starts_with("-") {
                 flags.push(Self::map_string_to_flag(arg)?);
             } else {
-                // parse downloadable
+                downloadables.push(Downloadable::build(arg)?);
             }
         }
 

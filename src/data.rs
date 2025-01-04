@@ -16,21 +16,36 @@ pub enum Flag {
 }
 
 pub struct Config {
+    downloadables: Vec<Downloadable>,
     flags: Vec<Flag>,
 }
 
+struct Downloadable;
+
 impl Config {
     pub fn from<I: Iterator<Item = String>>(mut raw_args: I) -> PEResult<Self> {
+        let downloadables = vec![];
         let mut flags: Vec<Flag> = vec![];
 
         while let Some(mut arg) = raw_args.next() {
             arg = arg.trim().to_lowercase();
             if arg.starts_with("-") {
                 flags.push(Self::map_string_to_flag(arg)?);
+            } else {
+                // parse downloadable
             }
         }
 
-        Ok(Self { flags })
+        if downloadables.len() == 0 {
+            return Err(ProgramError::new(
+                "no downloadable resources provided".to_string(),
+            ));
+        }
+
+        Ok(Self {
+            flags,
+            downloadables,
+        })
     }
 
     pub fn get_flags(&self) -> &Vec<Flag> {

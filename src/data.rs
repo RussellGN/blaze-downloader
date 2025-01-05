@@ -31,7 +31,10 @@ impl Downloadable {
         if url.is_ok() {
             Ok(Self { url: url.unwrap() })
         } else {
-            Err(ProgramError::new(url.unwrap_err().to_string()))
+            Err(ProgramError::new(format!(
+                "Failed to parse url: {}",
+                url.unwrap_err().to_string()
+            )))
         }
     }
 }
@@ -48,12 +51,6 @@ impl Config {
             } else {
                 downloadables.push(Downloadable::build(arg)?);
             }
-        }
-
-        if downloadables.len() == 0 {
-            return Err(ProgramError::new(
-                "no downloadable resources provided".to_string(),
-            ));
         }
 
         Ok(Self {

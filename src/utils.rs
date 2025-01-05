@@ -34,3 +34,6 @@ pub fn red_log(s: &str) {
 pub fn yellow_log(s: &str) {
     println!("{}", s.yellow());
 }
+pub fn green_log(s: &str) {
+    println!("{}", s.green());
+}

@@ -2,7 +2,7 @@ use std::{env, io::Write, path::Path};
 
 use crate::{
     constants::{CLI_HELP_TEXT_WITHOUT_PROJECT_NOR_FLAG_OPTION_DESCRIPTIONS, VALID_FLAGS},
-    utils::PEResult,
+    utils::{green_log, PEResult},
     yellow_log,
 };
 use colored::*;
@@ -44,7 +44,10 @@ impl Downloadable {
 
     pub async fn download(self) -> PEResult {
         match reqwest::get(self.url.as_str()).await {
-            Ok(res) => Self::save_to_file(res).await,
+            Ok(res) => {
+                green_log("\ndownloading..\n");
+                Self::save_to_file(res).await
+            }
             Err(e) => Err(ProgramError::new(format!(
                 "Failed to download resource at \"{}\". {e}",
                 self.url.as_str()
@@ -69,17 +72,21 @@ impl Downloadable {
             },
         };
 
-        yellow_log(format!("{:#?}", res.headers()).as_str());
+        yellow_log(format!("{:#?}", res).as_str());
 
-        let file_name = res
+        let file_name = &mut format!("file-[{}]", res.url());
+        *file_name = res
             .url()
-            .host()
-            .expect("should be able to get host")
+            .to_string()
+            .split("/")
+            .last()
+            .unwrap_or(file_name)
             .to_string();
         let f_path = &dir_path.join(Path::new(&file_name));
 
         match fs::File::create(f_path).await {
             Ok(f) => {
+                green_log("\nwriting to file..\n");
                 let mut f = f.into_std().await;
                 while let Ok(Some(chunk)) = res.chunk().await {
                     f.write(&chunk).expect(

@@ -1,9 +1,13 @@
+use std::{env, io::Write, path::Path};
+
 use crate::{
     constants::{CLI_HELP_TEXT_WITHOUT_PROJECT_NOR_FLAG_OPTION_DESCRIPTIONS, VALID_FLAGS},
     utils::PEResult,
+    yellow_log,
 };
 use colored::*;
 use reqwest::Url;
+use tokio::fs;
 
 #[derive(Debug)]
 pub struct ProgramError {
@@ -21,7 +25,7 @@ pub struct Config {
     flags: Vec<Flag>,
 }
 
-struct Downloadable {
+pub struct Downloadable {
     url: Url,
 }
 
@@ -35,6 +39,66 @@ impl Downloadable {
                 "Failed to parse url: {}",
                 url.unwrap_err().to_string()
             )))
+        }
+    }
+
+    pub async fn download(self) -> PEResult {
+        match reqwest::get(self.url.as_str()).await {
+            Ok(res) => Self::save_to_file(res).await,
+            Err(e) => Err(ProgramError::new(format!(
+                "Failed to download resource at \"{}\". {e}",
+                self.url.as_str()
+            ))),
+        }
+    }
+
+    async fn save_to_file(mut res: reqwest::Response) -> PEResult<()> {
+        let dir_path = &env::current_dir()
+            .expect("should be able to get cwd")
+            .join("downloads");
+
+        match fs::create_dir(dir_path).await {
+            Ok(_) => {}
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::AlreadyExists => {}
+                _ => {
+                    return Err(ProgramError::new(format!(
+                        "failed to create downloads dir: {e}"
+                    )))
+                }
+            },
+        };
+
+        yellow_log(format!("{:#?}", res.headers()).as_str());
+
+        let file_name = res
+            .url()
+            .host()
+            .expect("should be able to get host")
+            .to_string();
+        let f_path = &dir_path.join(Path::new(&file_name));
+
+        match fs::File::create(f_path).await {
+            Ok(f) => {
+                let mut f = f.into_std().await;
+                while let Ok(Some(chunk)) = res.chunk().await {
+                    f.write(&chunk).expect(
+                        format!(
+                            "should have been able to write to file: {}",
+                            f_path
+                                .as_path()
+                                .to_str()
+                                .expect("should be able to parse file path")
+                        )
+                        .as_str(),
+                    );
+                }
+
+                Ok(())
+            }
+            Err(e) => Err(ProgramError::new(format!(
+                "failed to create file for downloaded content: {e}"
+            ))),
         }
     }
 }
@@ -61,6 +125,10 @@ impl Config {
 
     pub fn get_flags(&self) -> &Vec<Flag> {
         &self.flags
+    }
+
+    pub fn get_downloadables(self) -> Vec<Downloadable> {
+        self.downloadables
     }
 
     fn map_string_to_flag(s: String) -> PEResult<Flag> {
